@@ -1,0 +1,12 @@
+numpy
+#Gestione di vettori, matrici e operazioni numeriche.
+pandas
+#Gestione del dataset temporale.
+scipy
+#Funzioni scientifiche e probabilistiche.
+scikit-learn
+#Servirà per: GaussianMixture; standardizzazione; eventuale PCA esplorativa; metriche; utility di validazione
+hmmlearn
+#implementazione di riferimento del Gaussian HMM.
+matplotlib
+#Creazione di tutti i grafici del progetto.
