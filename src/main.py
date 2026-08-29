@@ -50,12 +50,14 @@ from src.plots import (
     plot_hmm_timeline,
 )
 
+import logging
+logging.getLogger("hmmlearn.base").setLevel(logging.ERROR)
+
 def main():
     """
     Run the complete energy-regime analysis pipeline.
     """
 
-    # Data preparation
     raw_data = load_raw_data()
 
     time_data = create_datetime(
@@ -101,10 +103,6 @@ def main():
             test_standardized
         )
     )
-
-    # --------------------------------------------------
-    # GMM baseline
-    # --------------------------------------------------
 
     gmm_models, gmm_results = (
         train_gmm_candidates(
@@ -171,10 +169,6 @@ def main():
         gmm_temporal_results
     )
 
-    # --------------------------------------------------
-    # Gaussian HMM
-    # --------------------------------------------------
-
     hmm_models, hmm_results = (
         train_hmm_candidates(
             train_observations,
@@ -200,7 +194,6 @@ def main():
         f"K = {best_hmm_result['k']}"
     )
 
-    # Inference checks
     check_forward_algorithm(
         best_hmm,
         validation_observations,
@@ -219,7 +212,6 @@ def main():
         validation_lengths,
     )
 
-    # HMM interpretation
     hmm_state_means, hmm_state_stds = (
         get_hmm_parameters_original_scale(
             best_hmm,
@@ -293,10 +285,6 @@ def main():
         hmm_uncertainty_results
     )
 
-    # --------------------------------------------------
-    # Final comparison
-    # --------------------------------------------------
-
     print_model_comparison(
         gmm_train_score,
         gmm_validation_score,
@@ -307,10 +295,6 @@ def main():
         gmm_temporal_results,
         hmm_temporal_results,
     )
-
-    # --------------------------------------------------
-    # Figures
-    # --------------------------------------------------
 
     FIGURES_DIR.mkdir(
         parents=True,
@@ -353,10 +337,6 @@ def main():
         validation_standardized,
         validation_data,
     )
-
-    # --------------------------------------------------
-    # Save results
-    # --------------------------------------------------
 
     save_final_results(
         best_gmm_result,

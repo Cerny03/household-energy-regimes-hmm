@@ -23,19 +23,16 @@ def plot_model_selection(
     """
 
     gmm_k = [
-        #K = numero di componenti
         result["k"]
         for result in gmm_results
     ]
 
     gmm_scores = [
-        #estrae le validation log-likelihood
         result["validation_log_likelihood"]
         for result in gmm_results
     ]
 
     hmm_k = [
-        #K = numero di stati nascosti
         result["k"]
         for result in hmm_results
     ]
@@ -46,7 +43,6 @@ def plot_model_selection(
     ]
 
     plt.figure(figsize=(7, 5))
-    #crea una nuova figura.
 
     plt.plot(
         gmm_k,
@@ -56,7 +52,6 @@ def plot_model_selection(
     )
 
     plt.plot(
-        #nello stesso grafico avrai due linee
         hmm_k,
         hmm_scores,
         marker="o",
@@ -65,14 +60,11 @@ def plot_model_selection(
 
     plt.xlabel("Number of components / states")
     plt.ylabel("Validation average log-likelihood")
-    plt.title("Model selection")
     plt.xticks(gmm_k)
     plt.legend()
     plt.grid(alpha=0.3)
-    #alpha=0.3 significa trasparenza al 30%.
 
     plt.tight_layout()
-    #sistema automaticamente gli spazi per evitare che titoli ed etichette escano dalla figura.
 
     plt.savefig(
         FIGURES_DIR / "model_selection.png",
@@ -101,7 +93,6 @@ def plot_log_likelihood_comparison(
     )
 
     width = 0.35
-    #larghezza di ogni barra.
 
     plt.figure(figsize=(7, 5))
 
@@ -125,7 +116,6 @@ def plot_log_likelihood_comparison(
     )
 
     plt.ylabel("Average log-likelihood")
-    plt.title("GMM vs HMM")
     plt.legend()
 
     plt.tight_layout()
@@ -139,7 +129,6 @@ def plot_log_likelihood_comparison(
     plt.close()
 
 def plot_transition_matrix(model):
-    #visualizza la matrice di transizione dell'HMM.
     """
     Plot the HMM transition matrix.
     """
@@ -155,7 +144,6 @@ def plot_transition_matrix(model):
     )
 
     plt.colorbar(
-        #barra laterale che mostra la corrispondenza tra intensità e probabilità.
         image,
         label="Transition probability",
     )
@@ -172,21 +160,17 @@ def plot_transition_matrix(model):
 
     plt.xlabel("Next state")
     plt.ylabel("Current state")
-    plt.title("HMM transition matrix")
 
     for i in range(number_of_states):
 
         for j in range(number_of_states):
 
             plt.text(
-                #scrive dentro la casella il valore numerico.
                 j,
                 i,
                 f"{transition_matrix[i, j]:.2f}",
                 ha="center",
-                #horizontal alignment
                 va="center",
-                #vertical alignment
             )
 
     plt.tight_layout()
@@ -229,7 +213,6 @@ def plot_hmm_state_profiles(
     ):
 
         offset = (
-            #sposta le barre lateralmente
             feature_index
             - (number_of_features - 1) / 2
         ) * width
@@ -237,7 +220,6 @@ def plot_hmm_state_profiles(
         plt.bar(
             positions + offset,
             state_means[:, feature_index],
-            #per questa feature, prendimi la media in tutti gli stati.
             width,
             label=feature_names[
                 feature_index
@@ -255,7 +237,6 @@ def plot_hmm_state_profiles(
     )
 
     plt.ylabel("Mean hourly energy (kWh)")
-    plt.title("HMM state profiles")
     plt.legend()
 
     plt.tight_layout()
@@ -315,13 +296,10 @@ def plot_temporal_comparison(
 
 
 def plot_hmm_timeline(
-    #figura con tre pannelli allineati nel tempo: consumo energetico reale, stato HMM scelto da Viterbi, incertezza dell'HMM
     model,
-    #HMM già addestrato.
     standardized_data,
     original_data,
     max_hours=168,
-    #quante ore al massimo vuoi rappresentare. Una settimana
 ):
     """
     Plot one continuous validation sequence with
@@ -330,26 +308,22 @@ def plot_hmm_timeline(
 
     sequence_ids = (
         standardized_data["sequence_id"]
-        #sequence_id identifica le sequenze di ore consecutive senza buchi.
         .dropna()
         .unique()
     )
 
     first_sequence_id = sequence_ids[0]
-    #per il grafico mostro la prima sequenza temporale continua.
 
     standardized_sequence = (
         standardized_data[
             standardized_data["sequence_id"]
             == first_sequence_id
         ]
-        #mantiene solo le righe appartenenti alla sequenza 1.
         .copy()
         .reset_index(drop=True)
     )
 
     original_sequence = (
-        #stessa sequenza, ma dai dati non standardizzati.
         original_data[
             original_data["sequence_id"]
             == first_sequence_id
@@ -364,7 +338,6 @@ def plot_hmm_timeline(
     )
 
     standardized_sequence = (
-        #Taglia entrambe le sequenze
         standardized_sequence.iloc[
             :number_of_hours
         ]
@@ -381,31 +354,25 @@ def plot_hmm_timeline(
             MODEL_FEATURE_COLUMNS
         ]
         .to_numpy()
-        #trasformi da DataFrame pandas a matrice NumPy.
     )
 
     _, states = model.decode(
-        #qual è la sequenza di stati nascosti complessivamente più probabile per queste osservazioni
         observations,
         algorithm="viterbi",
     )
 
     covariances = model.covars_
-    #Recuperi le covarianze gaussiane dell'HMM.
 
     if covariances.ndim == 2:
         variances = covariances
-        #Se sono già rappresentate come: K × J cioè una varianza per ogni stato e feature, non devi fare nulla.
     else:
         variances = np.diagonal(
-            #se hai una matrice di covarianza completa per ogni stato, prendi soltanto la diagonale
             covariances,
             axis1=1,
             axis2=2,
         )
 
     posterior = (
-        #utilizzi Forward-Backward. dato l'intero segmento osservato, quali sono le probabilità dei diversi stati in quell'ora
         smoothed_state_probabilities(
             observations,
             model.startprob_,
@@ -416,17 +383,14 @@ def plot_hmm_timeline(
     )
 
     entropy = posterior_entropy(
-        #entropy≈0 HMM molto sicuro. entropy≈1 HMM molto incerto. Ottengo un valore per ogni ora.
         posterior
     )
 
     timestamps = original_sequence[
-        #Recuperi tempo e consumo originale
         DATETIME_COLUMN
     ]
 
     global_energy = original_sequence[
-        #consumo globale originale in kWh.
         "global_energy_kwh"
     ]
 
@@ -438,7 +402,6 @@ def plot_hmm_timeline(
     )
 
     axes[0].plot(
-        #Primo pannello: consumo energetico
         timestamps,
         global_energy,
     )
@@ -447,12 +410,7 @@ def plot_hmm_timeline(
         "Global energy\n(kWh)"
     )
 
-    axes[0].set_title(
-        "Household energy consumption and inferred HMM regimes"
-    )
-
     axes[1].step(
-        #Secondo pannello: stati Viterbi
         timestamps,
         states,
         where="post",
@@ -467,7 +425,6 @@ def plot_hmm_timeline(
     )
 
     axes[2].plot(
-        #Terzo pannello: entropia
         timestamps,
         entropy,
     )
@@ -481,7 +438,6 @@ def plot_hmm_timeline(
     )
 
     figure.autofmt_xdate()
-    #ruota le date e le dispone automaticamente in modo più leggibile.
 
     figure.tight_layout()
 

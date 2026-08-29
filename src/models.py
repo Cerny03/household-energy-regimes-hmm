@@ -1,16 +1,15 @@
 from sklearn.mixture import GaussianMixture
 import numpy as np
-
-from sklearn.mixture import GaussianMixture
 from hmmlearn.hmm import GaussianHMM
+
 from src.inference import (
     forward_log,
     smoothed_state_probabilities,
+    posterior_entropy,
     viterbi_log,
 )
 
 from src.config import (
-    FIGURES_DIR,
     MODEL_FEATURE_COLUMNS,
     RESULTS_DIR,
     RANDOM_SEED,
@@ -22,30 +21,10 @@ from src.config import (
     MIN_COVARIANCE,
 )
 
-from src.inference import (
-    forward_log,
-    smoothed_state_probabilities,
-    posterior_entropy,
-    viterbi_log,
-)
-
-from src.plots import (
-    plot_model_selection,
-    plot_log_likelihood_comparison,
-    plot_transition_matrix,
-    plot_hmm_state_profiles,
-    plot_temporal_comparison,
-    plot_hmm_timeline,
-)
-
 def fit_hmm_once(
-    #crea e addestra un singolo Gaussian HMM.
     train_observations,
-    #matrice dei dati: numero ore valide × numero feature
     train_lengths,
-    #dice al modello come queste 20.000 ore sono divise in sequenze temporali continue.
     number_of_states,
-    #quanti stati nascosti vuoi nell'HMM.
     random_seed,
 ):
     """
@@ -56,20 +35,16 @@ def fit_hmm_once(
         n_components=number_of_states,
         covariance_type=COVARIANCE_TYPE,
         min_covar=MIN_COVARIANCE,
-        #Non vuoi che durante l'addestramento una varianza diventi praticamente 0
         n_iter=MAX_ITERATIONS,
         tol=CONVERGENCE_TOLERANCE,
         random_state=random_seed,
         implementation="log",
-        #eseguire i calcoli dell'HMM usando il log-domain.
     )
 
     model.fit(
-        #cerca di imparare: prob iniziali, matr di transizione, medie gaussiane e covarianze/varianze gaussiane per ogni stato nascosto
         train_observations,
         train_lengths,
     )
-    #.fit() cerca i parametri che rendono i dati di training il più probabili possibile.
 
     return model
 
@@ -85,13 +60,11 @@ def fit_best_hmm_for_k(
 
     best_model = None
     best_train_score = -float("inf")
-    #qualunque score reale sarà maggiore di −∞.
 
     for initialization in range(N_INITIALIZATIONS):
 
         current_seed = (
             RANDOM_SEED + initialization
-            #le inizializzazioni sono diverse ma riproducibili.
         )
 
         model = fit_hmm_once(
@@ -102,12 +75,10 @@ def fit_best_hmm_for_k(
         )
 
         train_score = model.score(
-            #calcola la log-likelihood dei dati sotto il modello. P(X|THETA)
             train_observations,
             train_lengths,
         )
         if train_score > best_train_score:
-            #EM può finire in massimi locali.
             best_train_score = train_score
             best_model = model
 
@@ -115,7 +86,6 @@ def fit_best_hmm_for_k(
 
 
 def average_hmm_log_likelihood(
-    #Questa funzione misura quanto bene un HMM spiega un dataset.
     model,
     observations,
     lengths,
@@ -125,7 +95,6 @@ def average_hmm_log_likelihood(
     """
 
     total_log_likelihood = model.score(
-        #calcola P(X|THETA) per tutto il dataset, tenendo conto della struttura delle sequenze. 
         observations,
         lengths,
     )
@@ -138,7 +107,6 @@ def average_hmm_log_likelihood(
     return average_log_likelihood
 
 def train_hmm_candidates(
-    #proviamo HMM con diversi numeri di stati.
     train_observations,
     train_lengths,
     validation_observations,
@@ -149,7 +117,6 @@ def train_hmm_candidates(
     """
 
     models = {}
-    #dizionario che conterrà i modelli veri e propri
     results = []
 
     for number_of_states in N_STATES_CANDIDATES:
@@ -185,7 +152,6 @@ def train_hmm_candidates(
         }
 
         models[number_of_states] = model
-        #nel dizionario la chiave è il numeri di stati nascosti, il valore è il modello HMM addestrato.
         results.append(result)
 
     return models, results
@@ -199,14 +165,11 @@ def get_hmm_diagonal_variances(model):
 
     if covariances.ndim == 2:
         return covariances
-    #se sono già nella forma K×J, restituiscile direttamente.
 
     return np.diagonal(
-        #covariances non è più una semplice matrice 2D. È un array 3D: numero stati × numero feature × numero feature, lw feature sono i 4 tipi di consumo energetico.
         covariances,
         axis1=1,
         axis2=2,
-        #fai la diagonale tra la dimensione delle righe e quella delle colonne, mantenendo separata la dimensione degli stati.
     )
 
 def check_forward_algorithm(
@@ -230,7 +193,6 @@ def check_forward_algorithm(
     )
 
     _, custom_log_likelihood = forward_log(
-        #forward_log(...) restituisce due cose: log_alpha, log_likelihood (log P(x1,...,xT))
         first_sequence,
         model.startprob_,
         model.transmat_,
@@ -243,7 +205,6 @@ def check_forward_algorithm(
     )
 
     difference = abs(
-        #Se il tuo algoritmo è corretto, ti aspetti una differenza molto vicina a zero.
         custom_log_likelihood
         - hmmlearn_log_likelihood
     )
@@ -283,7 +244,6 @@ def check_viterbi_algorithm(
     )
 
     custom_path, custom_log_probability = (
-        #restituisce sequenza di stati nascosti più probabile. e la log-probabilità di quel percorso Viterbi.
         viterbi_log(
             first_sequence,
             model.startprob_,
@@ -297,7 +257,6 @@ def check_viterbi_algorithm(
         hmmlearn_log_probability,
         hmmlearn_path,
     ) = model.decode(
-        #model.decode(...) cerca il percorso di stati nascosti più probabile.
         first_sequence,
         algorithm="viterbi",
     )
@@ -355,7 +314,6 @@ def select_best_hmm(models, results):
 
             best_model = models[
                 result["k"]
-                #recuperi il corrispondente modello
             ]
 
     return best_model, best_result
@@ -404,7 +362,6 @@ def analyze_hmm_uncertainty(
 
     all_entropies = []
     all_max_probabilities = []
-    #per ogni ora, la probabilità dello stato più probabile.
 
     start = 0
 
@@ -417,7 +374,6 @@ def analyze_hmm_uncertainty(
         ]
 
         posterior = (
-            #Forward + Backward.
             smoothed_state_probabilities(
                 sequence,
                 model.startprob_,
@@ -456,7 +412,6 @@ def analyze_hmm_uncertainty(
 
     return {
         "mean_entropy": np.mean(all_entropies),
-        #incertezza media del modello
         "median_entropy": np.median(all_entropies),
         "mean_max_probability": np.mean(
             all_max_probabilities
@@ -521,7 +476,6 @@ def print_hmm_states(
             print(
                 f"{feature_name}: "
                 f"mean={state_means[state, feature_index]:.4f} kWh, "
-                #prendi la media della feature feature_index nello stato state.
                 f"std={state_stds[state, feature_index]:.4f} kWh"
             )
 
@@ -576,7 +530,6 @@ def analyze_hmm_temporal_behavior(
     """
 
     _, states = model.decode(
-        #Troviamo gli stati con Viterbi. Questo array dice: per ogni osservazione/ora, qual è lo stato del percorso Viterbi?
         observations,
         lengths,
         algorithm="viterbi",
@@ -610,7 +563,6 @@ def analyze_hmm_temporal_behavior(
             total_switches += switches.sum()
 
         current_run_length = 1
-        #Un run è un blocco consecutivo dello stesso stato.
 
         for time in range(
             1,
@@ -792,12 +744,10 @@ def check_forward_backward_algorithm(
     ]
 
     variances = get_hmm_diagonal_variances(
-        #prendi dal modello HMM le varianze gaussiane associate a ogni stato e feature.
         model
     )
 
     custom_posterior = (
-        #matrice, Ogni elemento è: probabilità che al tempo t lo stato nascosto sia k, avendo visto tutta la sequenza.
         smoothed_state_probabilities(
             first_sequence,
             model.startprob_,
@@ -808,12 +758,10 @@ def check_forward_backward_algorithm(
     )
 
     hmmlearn_posterior = model.predict_proba(
-        #stessa cosa con hmmlearn
         first_sequence
     )
 
     difference = np.max(
-        #confronti le due matrici
         np.abs(
             custom_posterior
             - hmmlearn_posterior
@@ -841,21 +789,15 @@ def fit_gmm(train_observations, number_of_components):
     """
 
     model = GaussianMixture(
-        #teoricamente:EM garantisce miglioramento locale, non necessariamente ottimo globale
         n_components=number_of_components,
-        #È semplicemente: K.
         covariance_type=COVARIANCE_TYPE,
         n_init=N_INITIALIZATIONS,
-        #scikit-learn prova cinque inizializzazioni e conserva quella con il risultato migliore.
         max_iter=MAX_ITERATIONS,
-        #una singola esecuzione di EM può effettuare al massimo 100 iterazioni.
         tol=CONVERGENCE_TOLERANCE,
-        #Quando il miglioramento della lower bound usata dall'implementazione diventa inferiore alla tolleranza, EM viene fermato.
         random_state=RANDOM_SEED,
     )
 
     model.fit(train_observations)
-    #il GMM non usa: train_lengths perché ignora completamente la struttura delle sequenze.
     return model
 
 
@@ -878,7 +820,6 @@ def train_gmm_candidates(
         )
 
         train_log_likelihood = model.score(
-            #score(X) restituisce la log-likelihood media per osservazione sotto il GMM.
             train_observations
         )
 
@@ -887,7 +828,6 @@ def train_gmm_candidates(
         )
 
         bic = model.bic(train_observations)
-        #Il BIC introduce una penalizzazione per la complessità del modello.
 
         result = {
             "k": number_of_components,
@@ -961,7 +901,6 @@ def get_gmm_parameters_original_scale(
     training_stds = feature_stds.to_numpy()
 
     component_means = (
-        #qua stiamo riportando le medie dei componenti del GMM alla scala originale dei dati in kWh
         model.means_ * training_stds
         + training_means
     )
@@ -1027,7 +966,6 @@ def analyze_gmm_temporal_behavior(
     valid_data["gmm_component"] = model.predict(
         observations
     )
-    #assegna ogni osservazione al componente GMM più probabile.
 
     total_transitions = 0
     total_switches = 0
@@ -1036,28 +974,22 @@ def analyze_gmm_temporal_behavior(
 
     for sequence_id, sequence in valid_data.groupby(
         "sequence_id"
-        #prende quindi una sequenza alla volta.
     ):
 
         states = sequence["gmm_component"].to_numpy()
 
         if len(states) < 2:
             continue
-        #Se c'è una sola ora, non puoi studiare transizioni
 
         total_transitions += len(states) - 1
-        #quante transizioni sono possibili
 
         switches = states[1:] != states[:-1]
-        #switches =[False, True, False, False, True, False], true significa qui il GMM ha cambiato componente.
 
         total_switches += switches.sum()
 
         current_run_length = 1
-        #sto osservando almeno una ora nello stato corrente
 
         for i in range(1, len(states)):
-            #Scorri gli stati dal secondo in poi
 
             if states[i] == states[i - 1]:
 
@@ -1346,292 +1278,3 @@ def save_final_results(
 
     print("\nFinal results saved in:")
     print(output_file)
-
-"""
-
-if __name__ == "__main__":
-
-    from src.data import (
-        load_raw_data,
-        create_datetime,
-        aggregate_hourly_data,
-        split_hourly_data,
-        standardize_splits,
-        prepare_model_data,
-    )
-
-    raw_data = load_raw_data()
-
-    time_data = create_datetime(raw_data)
-
-    hourly_data = aggregate_hourly_data(time_data)
-
-    train_data, validation_data, test_data = (
-        split_hourly_data(hourly_data)
-    )
-
-    (
-        train_standardized,
-        validation_standardized,
-        test_standardized,
-        feature_means,
-        feature_stds,
-    ) = standardize_splits(
-        train_data,
-        validation_data,
-        test_data,
-    )
-
-    train_observations, train_lengths = (
-        prepare_model_data(train_standardized)
-    )
-
-    validation_observations, validation_lengths = (
-        prepare_model_data(validation_standardized)
-    )
-
-    test_observations, test_lengths = (
-        prepare_model_data(test_standardized)
-    )
-
-    hmm_models, hmm_results = train_hmm_candidates(
-        train_observations,
-        train_lengths,
-        validation_observations,
-        validation_lengths,
-    )
-
-    print_hmm_results(hmm_results)
-
-    best_hmm, best_hmm_result = select_best_hmm(
-        hmm_models,
-        hmm_results,
-    )
-
-    print("\nBest HMM:")
-    print(f"K = {best_hmm_result['k']}")
-    print(
-        "Validation average log-likelihood = "
-        f"{best_hmm_result['validation_log_likelihood']:.4f}"
-    )
-
-    check_forward_algorithm(
-        best_hmm,
-        validation_observations,
-        validation_lengths,
-    )
-
-    check_forward_backward_algorithm(
-        best_hmm,
-        validation_observations,
-        validation_lengths,
-    )
-    check_viterbi_algorithm(
-        best_hmm,
-        validation_observations,
-        validation_lengths,
-    )
-
-    hmm_state_means, hmm_state_stds = (
-        get_hmm_parameters_original_scale(
-            best_hmm,
-            feature_means,
-            feature_stds,
-        )
-    )
-
-    print_hmm_states(
-        best_hmm,
-        hmm_state_means,
-        hmm_state_stds,
-    )
-
-    print_hmm_transition_matrix(
-        best_hmm
-    )
-
-    expected_durations = (
-        compute_expected_state_durations(
-            best_hmm
-        )
-    )
-
-    print_expected_state_durations(
-        best_hmm,
-        expected_durations,
-    )
-
-    hmm_temporal_results = (
-        analyze_hmm_temporal_behavior(
-            best_hmm,
-            validation_observations,
-            validation_lengths,
-        )
-    )
-
-    print_hmm_temporal_behavior(
-        hmm_temporal_results
-    )
-    (
-        hmm_train_score,
-        hmm_validation_score,
-        hmm_test_score,
-    ) = evaluate_hmm(
-        best_hmm,
-        train_observations,
-        train_lengths,
-        validation_observations,
-        validation_lengths,
-        test_observations,
-        test_lengths,
-    )
-
-    print_hmm_evaluation(
-        hmm_train_score,
-        hmm_validation_score,
-        hmm_test_score,
-    )
-
-    hmm_uncertainty_results = (
-        analyze_hmm_uncertainty(
-            best_hmm,
-            validation_observations,
-            validation_lengths,
-        )
-    )
-
-    print_hmm_uncertainty(
-        hmm_uncertainty_results
-    )
-
-    gmm_models, gmm_results = train_gmm_candidates(
-        train_observations,
-        validation_observations,
-    )
-
-    print_gmm_results(gmm_results)
-
-    best_model, best_result = select_best_gmm(
-        gmm_models,
-        gmm_results,
-    )
-
-    print("\nBest GMM:")
-    print(f"K = {best_result['k']}")
-    print(
-        "Validation log-likelihood = "
-        f"{best_result['validation_log_likelihood']:.4f}"
-    )
-
-    component_means, component_stds = (
-        get_gmm_parameters_original_scale(
-        best_model,
-        feature_means,
-        feature_stds,
-        )
-    )
-
-    (
-        gmm_train_score,
-        gmm_validation_score,
-        gmm_test_score,
-    ) = evaluate_gmm(
-        best_model,
-        train_observations,
-        validation_observations,
-        test_observations,
-    )
-
-    print_gmm_components(
-        best_model,
-        component_means,
-        component_stds,
-    )
-    print_gmm_evaluation(
-        gmm_train_score,
-        gmm_validation_score,
-        gmm_test_score,
-    )
-
-    gmm_temporal_results = (
-        analyze_gmm_temporal_behavior(
-            best_model,
-            validation_standardized,
-        )
-    )
-
-    print_gmm_temporal_behavior(
-        gmm_temporal_results
-    )
-
-    print_model_comparison(
-        gmm_train_score,
-        gmm_validation_score,
-        gmm_test_score,
-        hmm_train_score,
-        hmm_validation_score,
-        hmm_test_score,
-        gmm_temporal_results,
-        hmm_temporal_results,
-    )
-
-    FIGURES_DIR.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    plot_model_selection(
-        gmm_results,
-        hmm_results,
-    )
-
-    plot_log_likelihood_comparison(
-        [
-            gmm_train_score,
-            gmm_validation_score,
-            gmm_test_score,
-        ],
-        [
-            hmm_train_score,
-            hmm_validation_score,
-            hmm_test_score,
-        ],
-    )
-
-    plot_transition_matrix(
-        best_hmm
-    )
-
-    plot_hmm_state_profiles(
-        hmm_state_means
-    )
-
-    plot_temporal_comparison(
-        gmm_temporal_results,
-        hmm_temporal_results,
-    )
-
-    plot_hmm_timeline(
-        best_hmm,
-        validation_standardized,
-        validation_data,
-    )
-
-    print("\nFigures saved in:")
-    print(FIGURES_DIR)
-
-    save_final_results(
-        best_result,
-        best_hmm_result,
-        gmm_train_score,
-        gmm_validation_score,
-        gmm_test_score,
-        hmm_train_score,
-        hmm_validation_score,
-        hmm_test_score,
-        gmm_temporal_results,
-        hmm_temporal_results,
-        hmm_uncertainty_results,
-    )
-
-"""

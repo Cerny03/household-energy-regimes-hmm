@@ -1,24 +1,24 @@
 ENERGY REGIMES PROJECT - FINAL RESULTS
 ======================================
 
-Best GMM components: 5
-Best HMM states: 5
+Best GMM components: 11
+Best HMM states: 9
 
 AVERAGE LOG-LIKELIHOOD
-Train      | GMM=3.7888 | HMM=4.0684
-Validation | GMM=3.3576 | HMM=3.6502
-Test       | GMM=3.6950 | HMM=3.9414
+Train      | GMM=4.1733 | HMM=4.3781
+Validation | GMM=3.7876 | HMM=4.0333
+Test       | GMM=3.9623 | HMM=4.1362
 
 TEMPORAL BEHAVIOR ON VALIDATION
-GMM switch rate: 31.47%
-HMM switch rate: 29.93%
-GMM mean run length: 3.16 h
-HMM mean run length: 3.32 h
-GMM median run length: 2.00 h
-HMM median run length: 3.00 h
+GMM switch rate: 47.54%
+HMM switch rate: 40.47%
+GMM mean run length: 2.10 h
+HMM mean run length: 2.46 h
+GMM median run length: 1.00 h
+HMM median run length: 2.00 h
 
 HMM POSTERIOR UNCERTAINTY
-Mean normalized entropy: 0.0258
-Median normalized entropy: 0.0017
-Mean maximum posterior probability: 0.9847
-Posterior confidence < 0.80: 2.75%
+Mean normalized entropy: 0.0352
+Median normalized entropy: 0.0060
+Mean maximum posterior probability: 0.9723
+Posterior confidence < 0.80: 5.01%
